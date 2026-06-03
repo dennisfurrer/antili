@@ -738,7 +738,7 @@
           op=big?0.95:(0.45+Math.random()*0.4),
           tw=(2.0+Math.random()*3.6).toFixed(2), dl=(Math.random()*4.5).toFixed(2),
           dd=(24+Math.random()*32).toFixed(0), mx=(Math.random()*22-11).toFixed(1), my=(Math.random()*22-11).toFixed(1);
-      html+='<div class="star'+(big?' big':'')+='" style="left:'+x.toFixed(0)+'px;top:'+y.toFixed(0)+'px;width:'+s.toFixed(1)+'px;height:'+s.toFixed(1)+'px;'+
+      html+='<div class="star'+(big?' big':'')+'" style="left:'+x.toFixed(0)+'px;top:'+y.toFixed(0)+'px;width:'+s.toFixed(1)+'px;height:'+s.toFixed(1)+'px;'+
         '--mxop:'+op.toFixed(2)+';--d:'+tw+'s;animation-delay:'+dl+'s,'+dl+'s;--dd:'+dd+'s;--mx:'+mx+'px;--my:'+my+'px"></div>';
     }
     stars.innerHTML=html;
