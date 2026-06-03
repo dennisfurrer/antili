@@ -134,6 +134,9 @@
   .seed{width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;transform-origin:center;
     background:radial-gradient(circle,rgba(214,255,250,1),rgba(98,226,209,0.55) 38%,transparent 72%);
     box-shadow:0 0 22px 6px rgba(98,226,209,0.6)}
+  .specter{width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+    background:radial-gradient(circle,rgba(180,220,235,0.65),rgba(98,226,209,0.1) 54%,transparent 80%);
+    filter:blur(2.5px);will-change:transform,opacity}
 
   /* ---- tap ripple ---- */
   #ripples{position:absolute;inset:0;pointer-events:none;z-index:5}
@@ -505,7 +508,7 @@
   var identity = (function(){ var r=store.get("anti.id"); if(r){ try{ return JSON.parse(r); }catch(e){} }
     return {user:"dev-"+Math.random().toString(16).slice(2,6), project:"sandbox"}; })();
   function saveId(){ store.set("anti.id", JSON.stringify(identity)); }
-  function profKey(){ return identity.user + "\u241F" + identity.project; }
+  function profKey(){ return identity.user + "␟" + identity.project; }
 
   var cfg = (function(){ var r=store.get("anti.cfg"); if(r){ try{ var c=JSON.parse(r);
       if(["condense","coalesce","snap"].indexOf(c.arrival)<0) c.arrival="condense";
@@ -611,7 +614,7 @@
     screen="play"; running=true; paused=false;
     document.body.classList.add("playing");
     startScreen.classList.add("hide"); resultScreen.classList.add("hide");
-    $("hudTotal").textContent = total===Infinity ? "\u221E" : total;
+    $("hudTotal").textContent = total===Infinity ? "∞" : total;
     $("hudMode").innerHTML = "<b>"+cfg.diff+"</b> &middot; "+cfg.arrival+" &middot; "+cfg.grid;
     ambientFor(cfg.arrival);
     renderHud();
@@ -656,41 +659,73 @@
     missTimer=setTimeout(registerMiss, curDecay);
   }
 
-  /* ---- in-place materialization: the reticle condenses out of the ambient field ---- */
+  /* ---- specter arrival: dim shadow-particles drift slowly then accelerate into the reticle ---- */
   function startGather(p, done){
     state="gather";
     var dur=p.pursuit||620, i;
     sprite.style.transition="none"; sprite.style.opacity="1"; sprite.innerHTML=""; motes=[];
-    var fromX, fromY;
-    if(lastX!=null){ fromX=lastX; fromY=lastY; drawLink(fromX,fromY,targetX,targetY,dur); }
-    else { var a0=Math.random()*Math.PI*2, d0=80+Math.random()*70; fromX=targetX+Math.cos(a0)*d0; fromY=targetY+Math.sin(a0)*d0; }
+    var w=field.clientWidth, h=field.clientHeight;
+    if(lastX!=null) drawLink(lastX,lastY,targetX,targetY,dur);
 
-    // coalesce: a handful of nearby sparkles stream into the point as it forms
-    if(cfg.arrival==="coalesce"){
-      for(i=0;i<10;i++){ var a=Math.random()*Math.PI*2, d=60+Math.random()*85;
-        var m=document.createElement("div"); m.className="sp mote";
-        m.style.transform="translate("+(targetX+Math.cos(a)*d)+"px,"+(targetY+Math.sin(a)*d)+"px)"; m.style.opacity="0";
-        m.style.transition="transform "+dur+"ms cubic-bezier(.35,0,.2,1), opacity "+dur+"ms ease";
-        sprite.appendChild(m); motes.push(m); }
+    var count=(cfg.arrival==="coalesce")?14:5;
+    var specters=[];
+    for(i=0;i<count;i++){
+      var el=document.createElement("div"); el.className="sp specter";
+      var sx,sy;
+      if(cfg.arrival==="coalesce"){
+        var ca=(i/count)*Math.PI*2+Math.random()*0.6, cd=100+Math.random()*160;
+        sx=targetX+Math.cos(ca)*cd; sy=targetY+Math.sin(ca)*cd;
+      } else {
+        var fx=lastX!=null?lastX:targetX+(Math.random()-0.5)*300;
+        var fy=lastY!=null?lastY:targetY+(Math.random()-0.5)*300;
+        var ang=Math.atan2(fy-targetY,fx-targetX);
+        var sd=90+Math.random()*130;
+        sx=targetX+Math.cos(ang+(Math.random()-0.5)*0.9)*sd;
+        sy=targetY+Math.sin(ang+(Math.random()-0.5)*0.9)*sd;
+      }
+      sx=Math.max(20,Math.min(w-20,sx)); sy=Math.max(20,Math.min(h-20,sy));
+      el.style.transform="translate("+sx+"px,"+sy+"px)"; el.style.opacity="0";
+      sprite.appendChild(el);
+      specters.push({el:el,x:sx,y:sy,wAmp:4+Math.random()*7,wFreq:1.4+Math.random()*2,wOff:Math.random()*Math.PI*2});
     }
-
-    // the spark: starts tiny at the previous point and grows big into the reticle
-    var seed=document.createElement("div"); seed.className="sp seed";
-    seed.style.transform="translate("+fromX+"px,"+fromY+"px) scale(0.16)"; seed.style.opacity="0";
-    sprite.appendChild(seed);
+    motes=specters.map(function(s){return s.el;});
     void sprite.offsetWidth;
-    seed.style.transition="transform "+dur+"ms cubic-bezier(.4,0,.2,1), opacity "+Math.round(dur*0.4)+"ms ease-out";
-    seed.style.transform="translate("+targetX+"px,"+targetY+"px) scale("+(2.4*curScale)+")"; seed.style.opacity="1";
-    for(i=0;i<motes.length;i++){ motes[i].style.transform="translate("+targetX+"px,"+targetY+"px)"; motes[i].style.opacity="0.9"; }
+    specters.forEach(function(s){s.el.style.opacity="0.18";});
 
     pursuitCancel=false;
+    var t0g=performance.now(), ph1=dur*0.62;
+    function tick(now){
+      if(pursuitCancel) return;
+      var el=now-t0g;
+      specters.forEach(function(s){
+        var dx=targetX-s.x, dy=targetY-s.y, dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<0.8) return;
+        var spd,op;
+        if(el<ph1){
+          var t1=el/ph1, ease=t1*t1;
+          spd=0.014+ease*0.026;
+          op=0.13+ease*0.24;
+          var nx=-dy/dist, ny=dx/dist;
+          s.x+=dx*spd+nx*s.wAmp*Math.sin(s.wOff+el/900*s.wFreq)*0.18;
+          s.y+=dy*spd+ny*s.wAmp*Math.sin(s.wOff+el/900*s.wFreq)*0.18;
+        } else {
+          var t2=Math.min((el-ph1)/(dur-ph1),1), e2=t2*t2*(3-2*t2);
+          spd=0.09+e2*0.5;
+          op=0.37+e2*0.53;
+          s.x+=dx*spd; s.y+=dy*spd;
+        }
+        s.el.style.transform="translate("+s.x+"px,"+s.y+"px)";
+        s.el.style.opacity=op.toFixed(2);
+      });
+      if(el<dur && !pursuitCancel) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
     gatherTimer=setTimeout(function(){ if(pursuitCancel) return; spriteConverge(); done(); }, dur);
   }
   function cancelPursuit(){ pursuitCancel=true; clearTimeout(gatherTimer); gatherTimer=null; }
   function spriteConverge(){
-    var seed=sprite.querySelector(".seed");
-    if(seed){ seed.style.transition="transform .2s ease, opacity .22s ease"; seed.style.transform=seed.style.transform.replace(/scale\([^)]+\)/, "scale("+(3.1*curScale)+")"); }
-    sprite.style.transition="opacity .2s ease"; sprite.style.opacity="0";
+    sprite.style.transition="opacity .18s ease";
+    sprite.style.opacity="0";
   }
   function spriteHide(){ sprite.style.transition="none"; sprite.style.opacity="0"; sprite.innerHTML=""; motes=[]; }
 
@@ -703,7 +738,7 @@
           op=big?0.95:(0.45+Math.random()*0.4),
           tw=(2.0+Math.random()*3.6).toFixed(2), dl=(Math.random()*4.5).toFixed(2),
           dd=(24+Math.random()*32).toFixed(0), mx=(Math.random()*22-11).toFixed(1), my=(Math.random()*22-11).toFixed(1);
-      html+='<div class="star'+(big?' big':'')+'" style="left:'+x.toFixed(0)+'px;top:'+y.toFixed(0)+'px;width:'+s.toFixed(1)+'px;height:'+s.toFixed(1)+'px;'+
+      html+='<div class="star'+(big?' big':'')+='" style="left:'+x.toFixed(0)+'px;top:'+y.toFixed(0)+'px;width:'+s.toFixed(1)+'px;height:'+s.toFixed(1)+'px;'+
         '--mxop:'+op.toFixed(2)+';--d:'+tw+'s;animation-delay:'+dl+'s,'+dl+'s;--dd:'+dd+'s;--mx:'+mx+'px;--my:'+my+'px"></div>';
     }
     stars.innerHTML=html;
