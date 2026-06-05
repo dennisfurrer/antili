@@ -523,7 +523,7 @@
   var t0=0, targetX=0, targetY=0, curDecay=1200, curScale=1, curShrink=0.72;
   var waitTimer=null, missTimer=null, fbTimer=null, gatherTimer=null, pursuitCancel=false;
   var motes=[], lastX=null, lastY=null;
-  var mir={active:false,x:0,y:0,vx:0,vy:0,wx:0,wy:0,mode:'wander',sx:0,sy:0,parts:[],raf:null,pt:null,araf:null};
+  var mir={active:false,x:0,y:0,vx:0,vy:0,wx:0,wy:0,hx:0,hy:0,mode:'wander',fromX:0,fromY:0,toX:0,toY:0,cpX:0,cpY:0,duration:0,startTime:null,parts:[],raf:null,pt:null};
   var total = 5, sortMode = "index", lbFilter = "__all";
   var session = blankSession();
   function blankSession(){ return {trials:0,sumR:0,sumA:0,sumS:0,best:0,streak:0,misses:0,falseStarts:0}; }
@@ -667,18 +667,12 @@
       state="gather";
       var dur=p.pursuit||620;
       if(lastX!=null) drawLink(lastX,lastY,targetX,targetY,dur);
-      mirSeek(targetX,targetY);
+      mirSeek(targetX,targetY,dur);
       pursuitCancel=false;
-      var t0c=performance.now(), maxW=Math.max(dur,2200);
-      var checkArr=function(){
-        if(pursuitCancel){ mir.araf=null; return; }
-        var adx=mir.sx-mir.x, ady=mir.sy-mir.y;
-        if(Math.sqrt(adx*adx+ady*ady)<14||performance.now()-t0c>maxW){
-          mir.araf=null; spriteConverge(); done(); return;
-        }
-        mir.araf=requestAnimationFrame(checkArr);
-      };
-      mir.araf=requestAnimationFrame(checkArr);
+      gatherTimer=setTimeout(function(){
+        if(pursuitCancel) return;
+        spriteConverge(); done();
+      }, dur);
       return;
     }
     state="gather";
@@ -742,77 +736,98 @@
     requestAnimationFrame(tick);
     gatherTimer=setTimeout(function(){ if(pursuitCancel) return; spriteConverge(); done(); }, dur);
   }
-  function cancelPursuit(){ pursuitCancel=true; clearTimeout(gatherTimer); gatherTimer=null; if(mir.araf){cancelAnimationFrame(mir.araf);mir.araf=null;} }
+  function cancelPursuit(){ pursuitCancel=true; clearTimeout(gatherTimer); gatherTimer=null; }
   function spriteConverge(){
     sprite.style.transition="opacity .18s ease";
     sprite.style.opacity="0";
   }
   function spriteHide(){ sprite.style.transition="none"; sprite.style.opacity="0"; sprite.innerHTML=""; motes=[]; }
 
-  /* ---- coalesce: persistent wandering mirage ---- */
+  /* ---- coalesce: 50-particle mirage, bezier paths between reticles ---- */
   function mirInit(){
     if(mir.active) return;
     mir.active=true;
     var w=field.clientWidth, h=field.clientHeight;
     mir.x=80+Math.random()*(w-160); mir.y=80+Math.random()*(h-160);
-    mir.vx=(Math.random()-0.5)*30; mir.vy=(Math.random()-0.5)*30; mir.pt=null;
+    mir.fromX=mir.x; mir.fromY=mir.y;
+    mir.vx=(Math.random()-0.5)*20; mir.vy=(Math.random()-0.5)*20; mir.pt=null;
+    mir.mode="wander";
     sprite.style.transition="none"; sprite.style.opacity="1"; sprite.innerHTML=""; mir.parts=[];
-    for(var i=0;i<11;i++){
+    for(var i=0;i<50;i++){
       var el=document.createElement("div"); el.className="sp specter";
       el.style.transform="translate("+mir.x+"px,"+mir.y+"px)"; el.style.opacity="0";
       sprite.appendChild(el);
-      mir.parts.push({el:el,ox:(Math.random()-0.5)*28,oy:(Math.random()-0.5)*28,
-                      phase:Math.random()*Math.PI*2,freq:0.35+Math.random()*0.45});
+      mir.parts.push({el:el,
+        ox:(Math.random()-0.5)*2, oy:(Math.random()-0.5)*2,
+        phase:Math.random()*Math.PI*2,
+        freq:0.28+Math.random()*0.55,
+        baseOp:(0.07+Math.random()*0.52).toFixed(2)});
     }
     void sprite.offsetWidth;
-    mir.parts.forEach(function(p){p.el.style.opacity="0.32";});
-    mirPickWay(); mir.mode="wander";
-    mir.raf=requestAnimationFrame(mirTick);
+    mir.parts.forEach(function(p){p.el.style.opacity=p.baseOp;});
+    mirPickWay(); mir.raf=requestAnimationFrame(mirTick);
   }
   function mirPickWay(){
     var w=field.clientWidth, h=field.clientHeight, m=90;
     mir.wx=m+Math.random()*(w-2*m); mir.wy=m+Math.random()*(h-2*m);
   }
+  function bezierPt(t,p0,p1,p2){ var u=1-t; return u*u*p0+2*u*t*p1+t*t*p2; }
   function mirTick(now){
     if(!mir.active) return;
-    var dt=mir.pt?Math.min((now-mir.pt)/1000,0.05):0.016; mir.pt=now;
-    var dx,dy,d,sp;
-    if(mir.mode==="wander"){
+    var spread=0, dx, dy, d, sp, dt;
+    if(mir.mode==="journey"){
+      if(!mir.startTime) mir.startTime=now;
+      var rawT=Math.min((now-mir.startTime)/mir.duration,1);
+      var et=rawT*rawT*(3-2*rawT);
+      mir.x=bezierPt(et,mir.fromX,mir.cpX,mir.toX);
+      mir.y=bezierPt(et,mir.fromY,mir.cpY,mir.toY);
+      spread=Math.sin(rawT*Math.PI)*34;
+    } else if(mir.mode==="hover"){
+      dt=mir.pt?Math.min((now-mir.pt)/1000,0.05):0.016; mir.pt=now;
+      dx=mir.hx-mir.x; dy=mir.hy-mir.y;
+      mir.vx=(mir.vx+dx*1.2*dt)*0.88; mir.vy=(mir.vy+dy*1.2*dt)*0.88;
+      mir.x+=mir.vx*dt; mir.y+=mir.vy*dt;
+      spread=7;
+    } else {
+      dt=mir.pt?Math.min((now-mir.pt)/1000,0.05):0.016; mir.pt=now;
       dx=mir.wx-mir.x; dy=mir.wy-mir.y; d=Math.sqrt(dx*dx+dy*dy);
       if(d<50) mirPickWay();
       if(d>0){ mir.vx+=(dx/d)*90*dt; mir.vy+=(dy/d)*90*dt; }
       sp=Math.sqrt(mir.vx*mir.vx+mir.vy*mir.vy);
       if(sp>55){ mir.vx=mir.vx/sp*55; mir.vy=mir.vy/sp*55; }
-    } else {
-      dx=mir.sx-mir.x; dy=mir.sy-mir.y; d=Math.sqrt(dx*dx+dy*dy);
-      var tf=Math.max(0,1-d/420), ms=80+tf*tf*480;
-      if(d>0){ mir.vx+=(dx/d)*600*dt; mir.vy+=(dy/d)*600*dt; }
-      sp=Math.sqrt(mir.vx*mir.vx+mir.vy*mir.vy);
-      if(sp>ms){ mir.vx=mir.vx/sp*ms; mir.vy=mir.vy/sp*ms; }
+      mir.x+=mir.vx*dt; mir.y+=mir.vy*dt;
+      spread=18;
     }
-    mir.x+=mir.vx*dt; mir.y+=mir.vy*dt;
-    var os=(mir.mode==="seek")?Math.min(1,Math.sqrt((mir.sx-mir.x)*(mir.sx-mir.x)+(mir.sy-mir.y)*(mir.sy-mir.y))/90):1;
     mir.parts.forEach(function(p){
-      var px=mir.x+p.ox*Math.cos(now/1000*p.freq+p.phase)*os;
-      var py=mir.y+p.oy*Math.sin(now/1000*p.freq+p.phase)*os;
+      var px=mir.x+p.ox*spread*Math.cos(now/1000*p.freq+p.phase);
+      var py=mir.y+p.oy*spread*Math.sin(now/1000*p.freq+p.phase);
       p.el.style.transform="translate("+px+"px,"+py+"px)";
     });
     mir.raf=requestAnimationFrame(mirTick);
   }
-  function mirSeek(tx,ty){ mir.mode="seek"; mir.sx=tx; mir.sy=ty; }
-  function mirRelease(){
-    mir.mode="wander";
-    mir.vx=(Math.random()-0.5)*40; mir.vy=(Math.random()-0.5)*40;
-    mir.parts.forEach(function(p){p.ox=(Math.random()-0.5)*28;p.oy=(Math.random()-0.5)*28;});
-    mirPickWay();
-    sprite.style.transition="opacity .4s ease"; sprite.style.opacity="1";
+  function mirSeek(tx,ty,dur){
+    mir.fromX=mir.x; mir.fromY=mir.y;
+    mir.toX=tx; mir.toY=ty;
+    var mx=(mir.fromX+tx)/2, my=(mir.fromY+ty)/2;
+    var dx=tx-mir.fromX, dy=ty-mir.fromY, dist=Math.sqrt(dx*dx+dy*dy);
+    var off=(0.3+Math.random()*0.5)*Math.max(dist,80);
+    var sign=Math.random()>0.5?1:-1;
+    if(dist>0){ mir.cpX=mx+(-dy/dist)*off*sign; mir.cpY=my+(dx/dist)*off*sign; }
+    else{ mir.cpX=mx+(Math.random()-0.5)*100; mir.cpY=my+(Math.random()-0.5)*100; }
+    mir.duration=dur; mir.startTime=null; mir.pt=null;
+    mir.mode="journey";
+  }
+  function mirRelease(tx,ty){
+    mir.x=tx; mir.y=ty; mir.fromX=tx; mir.fromY=ty;
+    mir.hx=tx; mir.hy=ty; mir.vx=0; mir.vy=0; mir.pt=null;
+    mir.mode="hover";
+    sprite.style.transition="opacity .35s ease"; sprite.style.opacity="1";
   }
   function mirStop(){
     mir.active=false;
     if(mir.raf){cancelAnimationFrame(mir.raf);mir.raf=null;}
-    if(mir.araf){cancelAnimationFrame(mir.araf);mir.araf=null;}
     sprite.style.transition="none"; sprite.style.opacity="0"; sprite.innerHTML="";
-    mir.parts=[]; mir.pt=null;
+    mir.parts=[]; mir.pt=null; mir.startTime=null;
   }
 
   /* ---- ambient sparkle field (the background the sparkles live in) ---- */
@@ -902,7 +917,7 @@
   function advance(){
     lastX=targetX; lastY=targetY;
     state="feedback"; clearReticle();
-    if(cfg.arrival==="coalesce") mirRelease(); else spriteHide();
+    if(cfg.arrival==="coalesce") mirRelease(targetX,targetY); else spriteHide();
     if(session.trials>=total){ fbTimer=setTimeout(finish,520); return; }
     fbTimer=setTimeout(nextTrial,560);
   }
