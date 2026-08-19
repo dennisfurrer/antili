@@ -789,7 +789,7 @@
           var fw=field.clientWidth, fh=field.clientHeight;
           mir.wx=70+Math.random()*(fw-140); mir.wy=70+Math.random()*(fh-140);
         }
-        if(d>0){ mir.vx+=(dx/d)*88*dt; mir.vy+=(dy/d)*88*dt; }
+        if(d>0){ mir.vx+=(dx/d)*120*dt; mir.vy+=(dy/d)*120*dt; }
         sp=Math.sqrt(mir.vx*mir.vx+mir.vy*mir.vy);
         if(sp>24){ mir.vx=mir.vx/sp*24; mir.vy=mir.vy/sp*24; }
       mir.x+=mir.vx*dt; mir.y+=mir.vy*dt;
