@@ -523,7 +523,7 @@
   var t0=0, targetX=0, targetY=0, curDecay=1200, curScale=1, curShrink=0.72;
   var waitTimer=null, missTimer=null, fbTimer=null, gatherTimer=null, pursuitCancel=false;
   var motes=[], lastX=null, lastY=null;
-  var mir={active:false,x:0,y:0,vx:0,vy:0,wx:0,wy:0,hx:0,hy:0,mode:'wander',fromX:0,fromY:0,toX:0,toY:0,cpX:0,cpY:0,duration:0,startTime:null,parts:[],raf:null,pt:null};
+  var mir={active:false,x:0,y:0,vx:0,vy:0,wx:0,wy:0,hx:0,hy:0,mode:'wander',fromX:0,fromY:0,toX:0,toY:0,cpX:0,cpY:0,perpX:0,perpY:1,waveAmp:80,waveFreq:2,waveSide:1,duration:0,startTime:null,parts:[],raf:null,pt:null};
   var total = 5, sortMode = "index", lbFilter = "__all";
   var session = blankSession();
   function blankSession(){ return {trials:0,sumR:0,sumA:0,sumS:0,best:0,streak:0,misses:0,falseStarts:0}; }
@@ -780,11 +780,15 @@
         if(!mir.startTime) mir.startTime=now;
         var rawT=Math.min((now-mir.startTime)/mir.duration,1);
         var et=rawT*rawT*(3-2*rawT);
-        var lT=Math.min(et+0.10,1);
-        var bx=bezierPt(lT,mir.fromX,mir.cpX,mir.toX);
-        var by=bezierPt(lT,mir.fromY,mir.cpY,mir.toY);
+        var gx=mir.fromX+(mir.toX-mir.fromX)*et;
+        var gy=mir.fromY+(mir.toY-mir.fromY)*et;
+        var fade=rawT>0.75?(1-rawT)/0.25:1;
+        var sOff=mir.waveAmp*Math.sin(rawT*Math.PI*mir.waveFreq)*mir.waveSide*fade;
+        var fw2=field.clientWidth, fh2=field.clientHeight;
+        var goalX=Math.max(40,Math.min(fw2-40,gx+mir.perpX*sOff));
+        var goalY=Math.max(40,Math.min(fh2-40,gy+mir.perpY*sOff));
         var steerF=100+et*300, maxS=26+et*110;
-        dx=bx-mir.x; dy=by-mir.y; d=Math.sqrt(dx*dx+dy*dy);
+        dx=goalX-mir.x; dy=goalY-mir.y; d=Math.sqrt(dx*dx+dy*dy);
         if(d>0){ mir.vx+=(dx/d)*steerF*dt; mir.vy+=(dy/d)*steerF*dt; }
         sp=Math.sqrt(mir.vx*mir.vx+mir.vy*mir.vy);
         if(sp>maxS){ mir.vx=mir.vx/sp*maxS; mir.vy=mir.vy/sp*maxS; }
@@ -812,6 +816,11 @@
       mir.x+=mir.vx*dt; mir.y+=mir.vy*dt;
       spread=18;
     }
+    var _fw=field.clientWidth,_fh=field.clientHeight,_bm=35;
+    if(mir.x<_bm&&mir.vx<0){mir.x=_bm;mir.vx=-mir.vx*0.85;}
+    if(mir.x>_fw-_bm&&mir.vx>0){mir.x=_fw-_bm;mir.vx=-mir.vx*0.85;}
+    if(mir.y<_bm&&mir.vy<0){mir.y=_bm;mir.vy=-mir.vy*0.85;}
+    if(mir.y>_fh-_bm&&mir.vy>0){mir.y=_fh-_bm;mir.vy=-mir.vy*0.85;}
     mir.parts.forEach(function(p){
       var px=mir.x+p.ox*spread*Math.cos(now/1000*p.freq+p.phase);
       var py=mir.y+p.oy*spread*Math.sin(now/1000*p.freq+p.phase);
@@ -822,12 +831,13 @@
   function mirSeek(tx,ty,dur){
     mir.fromX=mir.x; mir.fromY=mir.y;
     mir.toX=tx; mir.toY=ty;
-    var mx=(mir.fromX+tx)/2, my=(mir.fromY+ty)/2;
-    var dx=tx-mir.fromX, dy=ty-mir.fromY, dist=Math.sqrt(dx*dx+dy*dy);
-    var off=(0.3+Math.random()*0.5)*Math.max(dist,80);
-    var sign=Math.random()>0.5?1:-1;
-    if(dist>0){ mir.cpX=mx+(-dy/dist)*off*sign; mir.cpY=my+(dx/dist)*off*sign; }
-    else{ mir.cpX=mx+(Math.random()-0.5)*100; mir.cpY=my+(Math.random()-0.5)*100; }
+    var ddx=tx-mir.x, ddy=ty-mir.y, dist=Math.sqrt(ddx*ddx+ddy*ddy);
+    if(dist>0){ mir.perpX=-ddy/dist; mir.perpY=ddx/dist; }
+    else{ mir.perpX=1; mir.perpY=0; }
+    if(Math.random()>0.5){ mir.perpX=-mir.perpX; mir.perpY=-mir.perpY; }
+    mir.waveAmp=55+Math.random()*80;
+    mir.waveFreq=1.5+Math.random()*2.5;
+    mir.waveSide=Math.random()>0.5?1:-1;
     mir.duration=dur; mir.startTime=null; mir.pt=null;
     mir.mode="journey";
   }
