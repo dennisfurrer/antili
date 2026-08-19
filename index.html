@@ -776,12 +776,20 @@
     if(!mir.active) return;
     var spread=0, dx, dy, d, sp, dt;
     if(mir.mode==="journey"){
-      if(!mir.startTime) mir.startTime=now;
-      var rawT=Math.min((now-mir.startTime)/mir.duration,1);
-      var et=rawT*rawT*(3-2*rawT);
-      mir.x=bezierPt(et,mir.fromX,mir.cpX,mir.toX);
-      mir.y=bezierPt(et,mir.fromY,mir.cpY,mir.toY);
-      spread=Math.sin(rawT*Math.PI)*34;
+        dt=mir.pt?Math.min((now-mir.pt)/1000,0.05):0.016; mir.pt=now;
+        if(!mir.startTime) mir.startTime=now;
+        var rawT=Math.min((now-mir.startTime)/mir.duration,1);
+        var et=rawT*rawT*(3-2*rawT);
+        var lT=Math.min(et+0.10,1);
+        var bx=bezierPt(lT,mir.fromX,mir.cpX,mir.toX);
+        var by=bezierPt(lT,mir.fromY,mir.cpY,mir.toY);
+        var steerF=100+et*300, maxS=26+et*110;
+        dx=bx-mir.x; dy=by-mir.y; d=Math.sqrt(dx*dx+dy*dy);
+        if(d>0){ mir.vx+=(dx/d)*steerF*dt; mir.vy+=(dy/d)*steerF*dt; }
+        sp=Math.sqrt(mir.vx*mir.vx+mir.vy*mir.vy);
+        if(sp>maxS){ mir.vx=mir.vx/sp*maxS; mir.vy=mir.vy/sp*maxS; }
+        mir.x+=mir.vx*dt; mir.y+=mir.vy*dt;
+        spread=Math.sin(rawT*Math.PI)*34;
     } else if(mir.mode==="hover"){
       dt=mir.pt?Math.min((now-mir.pt)/1000,0.05):0.016; mir.pt=now;
       dx=mir.wx-mir.x; dy=mir.wy-mir.y; d=Math.sqrt(dx*dx+dy*dy);
