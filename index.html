@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>anti.li — focus & refocus instrument</title>
+<title>anti.li — focus &amp; refocus instrument</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -453,6 +453,8 @@
         <div class="stat"><div class="k">false starts</div><div class="v" id="rFalse">0</div></div>
       </div>
 
+      <div class="blk-h"><span class="t">this week</span><span class="n" id="glbStatus"></span></div>
+      <div class="lb-wrap"><table><thead><tr><th>operator</th><th>avg score</th><th>mode</th></tr></thead><tbody id="glbBody"></tbody></table><div class="lb-empty" id="glbEmpty">loading&#8230;</div></div>
       <div class="blk-h"><span class="t">leaderboard</span><span class="n" id="lbCount"></span></div>
       <div class="lb-tools">
         <select id="projFilter"><option value="__all">all projects</option></select>
@@ -488,7 +490,9 @@
   var ESC = { decayFrom:1760, decayTo:880, shrinkFrom:0.74, shrinkTo:0.50,
               wMinFrom:840, wMinTo:480, wMaxFrom:2200, wMaxTo:1380,
               pursuitFrom:760, pursuitTo:440 };
-  var BASE_R = 150;            // precision radius at scale 1
+  var BASE_R = 150;
+     var WORKER_URL="https://antili-score-db-worker.assem-afifi.workers.dev";
+
   var GRID = 34;               // flat snap lattice
   var TILE = 58, GAP = 10;     // tiles geometry
   var MARGIN = 78;
@@ -970,13 +974,34 @@ function mirRelease(tx,ty){
     renderHud();
   }
 
-  function finish(){
+  function submitScore(){
+       if(!WORKER_URL||session.trials<1) return;
+       var avg=Math.round(session.sumS/Math.max(session.trials,1));
+       var name=(identity&&identity.user?identity.user:"anon").slice(0,24);
+       var mode=(cfg.diff||"std")+"/"+(cfg.arrival||"condense");
+       fetch(WORKER_URL+"/score",{method:"POST",headers:{"Content-Type":"application/json"},
+         body:JSON.stringify({name:name,score:avg,mode:mode})}).catch(function(){});
+     }
+     function loadLeaderboard(){
+       var ge=$("glbEmpty"),gb=$("glbBody"); if(!ge||!gb) return;
+       ge.style.display="block"; ge.textContent="loading…"; gb.innerHTML="";
+       fetch(WORKER_URL+"/scores").then(function(r){return r.json();}).then(function(top){
+         ge.style.display="none";
+         if(!top||!top.length){ge.style.display="block";ge.textContent="no scores this week yet";return;}
+         top.forEach(function(e,i){
+           var tr=document.createElement("tr");
+           tr.innerHTML="<td>"+([“1st”,“2nd”,“3rd”,“4th”,“5th”][i]||"")+ " "+e.name+"</td><td>"+e.score+"</td><td>"+(String(e.mode||"").split("/")[0])+"</td>";
+           gb.appendChild(tr);
+         });
+       }).catch(function(){ge.style.display="block";ge.textContent="couldn't reach server";});
+     }
+     function finish(){
     running=false; clearTimers(); clearReticle();
     if(mir.active) mirStop(); else spriteHide();
     stars.classList.remove("on");
     document.body.classList.remove("playing");
     screen="results";
-    fillResults();
+    fillResults(); submitScore(); loadLeaderboard();
     resultScreen.classList.remove("hide");
   }
   function clearTimers(){ clearTimeout(waitTimer); clearTimeout(missTimer); clearTimeout(fbTimer); cancelPursuit(); }
@@ -1187,4 +1212,3 @@ function mirRelease(tx,ty){
 })();
 </script>
 </body>
-</html>
