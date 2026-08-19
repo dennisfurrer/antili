@@ -984,16 +984,17 @@ function mirRelease(tx,ty){
      }
      function loadLeaderboard(){
        var ge=$("glbEmpty"),gb=$("glbBody"); if(!ge||!gb) return;
-       ge.style.display="block"; ge.textContent="loading…"; gb.innerHTML="";
+       ge.style.display="block"; ge.textContent="loading..."; gb.innerHTML="";
        fetch(WORKER_URL+"/scores").then(function(r){return r.json();}).then(function(top){
          ge.style.display="none";
          if(!top||!top.length){ge.style.display="block";ge.textContent="no scores this week yet";return;}
          top.forEach(function(e,i){
            var tr=document.createElement("tr");
-           tr.innerHTML="<td>"+([“1st”,“2nd”,“3rd”,“4th”,“5th”][i]||"")+ " "+e.name+"</td><td>"+e.score+"</td><td>"+(String(e.mode||"").split("/")[0])+"</td>";
+           var rank=["1st","2nd","3rd","4th","5th"][i]||"";
+           tr.innerHTML="<td>"+rank+" "+e.name+"</td><td>"+e.score+"</td><td>"+(String(e.mode||"").split("/")[0])+"</td>";
            gb.appendChild(tr);
          });
-       }).catch(function(){ge.style.display="block";ge.textContent="couldn't reach server";});
+       }).catch(function(){ge.style.display="block";ge.textContent="could not reach server";});
      }
      function finish(){
     running=false; clearTimers(); clearReticle();
