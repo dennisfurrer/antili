@@ -453,9 +453,10 @@
         <div class="stat"><div class="k">false starts</div><div class="v" id="rFalse">0</div></div>
       </div>
 
-      <div class="blk-h"><span class="t">this week</span><span class="n" id="glbStatus"></span></div>
-      <div class="lb-wrap"><table><thead><tr><th>operator</th><th>avg score</th><th>mode</th></tr></thead><tbody id="glbBody"></tbody></table><div class="lb-empty" id="glbEmpty">loading&#8230;</div></div>
-      <div class="blk-h"><span class="t">leaderboard</span><span class="n" id="lbCount"></span></div>
+      <div class="blk-h"><span class="t">Global Leaderboard</span><span class="n" id="glbStatus"></span></div>
+      <div class="lb-wrap"><table><thead><tr><th class="l">operator</th><th>avg score</th><th>mode</th></tr></thead><tbody id="glbBody"></tbody></table><div class="lb-empty" id="glbEmpty">loading&#8230;</div></div>
+      <div style="height:2px;background:var(--hair);margin:26px 0;border-radius:1px"></div>
+      <div class="blk-h"><span class="t">Local High Scores</span><span class="n" id="lbCount"></span></div>
       <div class="lb-tools">
         <select id="projFilter"><option value="__all">all projects</option></select>
         <button class="tbtn" id="sortBtn">sort: index</button>
@@ -974,7 +975,7 @@ function mirRelease(tx,ty){
        var name=(identity&&identity.user?identity.user:"anon").slice(0,24);
        var mode=(cfg.diff||"std")+"/"+(cfg.arrival||"condense");
        fetch(WORKER_URL+"/score",{method:"POST",headers:{"Content-Type":"application/json"},
-         body:JSON.stringify({name:name,score:avg,mode:mode})}).catch(function(){});
+         body:JSON.stringify({name:name,score:avg,mode:mode,project:(identity&&identity.project?identity.project:"sandbox").slice(0,24)})}).catch(function(){});
      }
      function loadLeaderboard(){
        var ge=$("glbEmpty"),gb=$("glbBody"); if(!ge||!gb) return;
@@ -985,7 +986,7 @@ function mirRelease(tx,ty){
          top.forEach(function(e,i){
            var tr=document.createElement("tr");
            var rank=["1st","2nd","3rd","4th","5th"][i]||"";
-           tr.innerHTML="<td>"+rank+" "+e.name+"</td><td>"+e.score+"</td><td>"+(String(e.mode||"").split("/")[0])+"</td>";
+           tr.innerHTML="<td class=\"l\"><span class=\"rk\">"+rank+"</span>"+e.name+(e.project?'<div class="pj">'+e.project+"</div>":"")+"</td><td>"+e.score+"</td><td>"+(String(e.mode||"").split("/")[0])+"</td>";
            gb.appendChild(tr);
          });
        }).catch(function(){ge.style.display="block";ge.textContent="could not reach server";});
