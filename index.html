@@ -9,8 +9,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="anti.li">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
+<script>if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -583,7 +584,7 @@
     for(var i=0;i<n;i++) html+='<div class="tile"></div>';
     gTiles.innerHTML=html;
   }
-  function buildTunnel(){   // "well" — perspective shaft drawn over the foreground grid
+  function buildTunnel(){
     var w=field.clientWidth, h=field.clientHeight, cx=w/2, cy=h/2, i;
     var scs=[0.82,0.64,0.50,0.39,0.30,0.23,0.175,0.13];
     var squares="";
@@ -604,9 +605,9 @@
   function trialParams(i){
     if(cfg.diff==="escalate"){
       var raw = total===Infinity ? Math.min(i/14,1) : (total>1 ? i/(total-1) : 1);
-      var t = raw*raw*(3-2*raw);                 // smoothstep — smoother ramp
+      var t = raw*raw*(3-2*raw);
       return {
-        scale:  ESC_START,                       // consistent start size across the ramp
+        scale:  ESC_START,
         shrink: lerp(ESC.shrinkFrom, ESC.shrinkTo, t),
         decay:  lerp(ESC.decayFrom,  ESC.decayTo,  t),
         pursuit:lerp(ESC.pursuitFrom,ESC.pursuitTo,t),
@@ -658,7 +659,6 @@
     else { startGather(p, materialize); }
   }
 
-  // the reticle forms at the target and decays (the fade is the speed meter)
   function materialize(){
     reticle.style.left=targetX+"px"; reticle.style.top=targetY+"px";
     reticle.classList.add("live");
@@ -673,7 +673,6 @@
     missTimer=setTimeout(registerMiss, curDecay);
   }
 
-  /* ---- specter arrival ---- */
   function startGather(p, done){
     if(cfg.arrival==="coalesce"){
       state="gather";
@@ -756,7 +755,6 @@
   }
   function spriteHide(){ sprite.style.transition="none"; sprite.style.opacity="0"; sprite.innerHTML=""; motes=[]; }
 
-  /* ---- coalesce: 50-particle mirage, bezier paths between reticles ---- */
   function mirInit(){
     if(mir.active) return;
     mir.active=true;
@@ -867,7 +865,6 @@ function mirRelease(tx,ty){
     mir.parts=[]; mir.pt=null; mir.startTime=null;
   }
 
-  /* ---- ambient sparkle field (the background the sparkles live in) ---- */
   function buildStars(){
     var w=field.clientWidth, h=field.clientHeight, n=Math.round(w*h/19000)+34, html="", i;
     for(i=0;i<n;i++){
@@ -1009,7 +1006,6 @@ function mirRelease(tx,ty){
   }
   function clearTimers(){ clearTimeout(waitTimer); clearTimeout(missTimer); clearTimeout(fbTimer); cancelPursuit(); }
 
-  /* ============ FEEDBACK FX ============ */
   function drawFx(cx,cy,tx,ty,col){
     var r=field.getBoundingClientRect();
     fx.setAttribute("viewBox","0 0 "+r.width+" "+r.height);
@@ -1021,7 +1017,6 @@ function mirRelease(tx,ty){
     fx.style.transition="opacity 600ms ease"; fx.style.opacity="0";
   }
 
-  /* ============ RENDER ============ */
   function renderHud(){
     $("hudRep").textContent=session.trials;
     $("hudIdx").textContent=session.trials?Math.round(session.sumS/session.trials):0;
@@ -1103,10 +1098,9 @@ function mirRelease(tx,ty){
     $("previewBoard").innerHTML = html || '<div class="mini-empty">No reps yet — run a session to populate the board.</div>';
   }
 
-  function escH(s){ return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;";">":"&gt;"}[c];}); }
+  function escH(s){ return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];}); }
   function escA(s){ return escH(s).replace(/"/g,"&quot;"); }
 
-  /* ============ EXPORT / IMPORT ============ */
   function dl(name,text,type){ var b=new Blob([text],{type:type}),a=document.createElement("a");
     a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click();
     setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200); }
@@ -1133,13 +1127,11 @@ function mirRelease(tx,ty){
     rd.readAsText(file);
   }
 
-  /* ============ IDENTITY ============ */
   function commitId(){
     var u=$("userInput").value.trim()||"anon", p=$("projInput").value.trim()||"sandbox";
     identity.user=u; identity.project=p; saveId(); renderPreview();
   }
 
-  /* ============ EVENTS ============ */
   field.addEventListener("pointerdown", onClick);
   field.addEventListener("contextmenu", function(e){ e.preventDefault(); });
   field.addEventListener("touchstart", function(e){ if(screen==="play") e.preventDefault(); }, {passive:false});
@@ -1208,7 +1200,6 @@ function mirRelease(tx,ty){
     rT=setTimeout(function(){ if(cfg.grid==="tiles"||cfg.grid==="tiles2") buildTiles(); if(cfg.grid==="tunnel") buildTunnel(); if(stars.classList.contains("on")) buildStars(); if(state==="active") clearReticle(); },160);
   });
 
-  /* ============ INIT ============ */
   setGrid(cfg.grid);
   setAccUI();
   renderPreview();
